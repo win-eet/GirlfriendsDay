@@ -356,10 +356,10 @@
       <path d="M130,160 C300,260 300,360 470,530 C300,660 300,760 130,900 C300,1030 300,1130 470,1270 C400,1420 400,1520 296,1650"
             fill="none" stroke="#b79cff" stroke-width="6" stroke-linecap="round" stroke-dasharray="2 18" opacity="0.55"/>
     </svg>
-    <div class="deco" style="top:20px;left:280px;">🗺️</div>
-    <div class="deco" style="top:600px;left:560px;">✨</div>
-    <div class="deco" style="top:980px;left:40px;">🌸</div>
-    <div class="deco" style="top:1350px;left:540px;">⭐</div>
+    <div class="deco" style="top:0.99%;left:43.75%;">🗺️</div>
+    <div class="deco" style="top:29.7%;left:87.5%;">✨</div>
+    <div class="deco" style="top:48.51%;left:6.25%;">🌸</div>
+    <div class="deco" style="top:66.83%;left:84.375%;">⭐</div>
     <!-- nodes injected by JS -->
     <div id="avatarWalker" class="avatar-walker"></div>
   </div>
@@ -609,8 +609,8 @@ function renderMap(){
     node.className = 'node' + (pos.final? ' final':'');
     if(completed[i]) node.classList.add('completed');
     else if(i+1 === unlockedLevel) node.classList.add('unlocked');
-    node.style.top = pos.top+'px';
-    node.style.left = pos.left+'px';
+    node.style.top = (pos.top/2020*100)+'%';
+    node.style.left = (pos.left/640*100)+'%';
     node.innerHTML = `<div class="icon">${lvl.icon}</div>` + (completed[i] || i+1===unlockedLevel ? '' : `<div class="lock">🔒</div>`);
     const label = document.createElement('div');
     label.className = 'node-label';
@@ -628,9 +628,13 @@ renderMap();
 const avatarWalker = document.getElementById('avatarWalker');
 avatarWalker.appendChild(photoFigure(CONFIG.avatarPhoto, true));
 function nodeCenter(i){
-  const pos = NODE_POS[i];
-  const size = pos.final ? 132 : 112;
-  return { x: pos.left + size/2, y: pos.top + size/2 };
+  const nodeEl = mapTrack.querySelectorAll('.node')[i];
+  const trackRect = mapTrack.getBoundingClientRect();
+  const nodeRect = nodeEl.getBoundingClientRect();
+  return {
+    x: nodeRect.left - trackRect.left + nodeRect.width/2,
+    y: nodeRect.top - trackRect.top + nodeRect.height/2
+  };
 }
 function positionAvatar(i, animate){
   const c = nodeCenter(i);
