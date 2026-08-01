@@ -33,15 +33,6 @@
   .script{font-family:'Pacifico',cursive;}
   .hidden{display:none !important;}
   button{font-family:inherit;cursor:pointer;border:none;}
-  #musicToggle{
-    position:fixed;top:18px;right:18px;z-index:95;
-    width:44px;height:44px;border-radius:50%;
-    background:rgba(255,255,255,0.85);box-shadow:0 6px 16px rgba(0,0,0,0.15);
-    font-size:18px;display:flex;align-items:center;justify-content:center;
-    transition:transform 0.15s ease, opacity 0.3s ease;
-  }
-  #musicToggle:active{transform:scale(0.92);}
-  #musicToggle.muted{opacity:0.5;}
 
   /* ---------- INTRO (fixed full-screen "portal" — scroll zooms THROUGH it into the map) ---------- */
   #intro{
@@ -339,8 +330,6 @@
 </head>
 <body>
 
-<button id="musicToggle" type="button" aria-label="Toggle music">🎵</button>
-
 <!-- ============ INTRO ============ -->
 <section id="intro">
   <div class="blob blob1"></div>
@@ -466,60 +455,6 @@ document.querySelector('#intro .line1').textContent = CONFIG.introLine1;
 document.querySelector('#intro .line2').textContent = CONFIG.introLine2;
 document.getElementById('mapTitle').textContent = CONFIG.mapTitle;
 
-/* ---------- soft ambient background music ----------
-   Generated in-browser (a few slow, detuned sine pads) rather than a licensed track —
-   keeps this fully self-contained with no external file or copyright question, and it's
-   easy to swap for a real song later if you want (just point an <audio> tag at a file
-   and drop the Music.ensureStarted() call below). Starts very softly on her first
-   interaction, since browsers block audio until a real user gesture happens. */
-const Music = (function(){
-  let ctx=null, master=null, on=true, started=false;
-  function ensureStarted(){
-    if(started) return;
-    started = true;
-    ctx = new (window.AudioContext||window.webkitAudioContext)();
-    master = ctx.createGain();
-    master.gain.value = 0;
-    const filter = ctx.createBiquadFilter();
-    filter.type = 'lowpass'; filter.frequency.value = 900;
-    master.connect(filter); filter.connect(ctx.destination);
-    const freqs = [130.81, 164.81, 196.00, 261.63]; // soft low C-major-ish pad
-    freqs.forEach((f,i)=>{
-      const osc = ctx.createOscillator();
-      osc.type = 'sine'; osc.frequency.value = f;
-      const g = ctx.createGain(); g.gain.value = 0.16;
-      osc.connect(g); g.connect(master); osc.start();
-      // a slow, gentle drift per note so the chord breathes instead of sitting static
-      const lfo = ctx.createOscillator();
-      lfo.frequency.value = 0.05 + i*0.01;
-      const lfoGain = ctx.createGain(); lfoGain.gain.value = 1.5;
-      lfo.connect(lfoGain); lfoGain.connect(osc.frequency); lfo.start();
-    });
-    master.gain.linearRampToValueAtTime(on?0.05:0, ctx.currentTime+3);
-  }
-  function setOn(v){
-    on = v;
-    if(master) master.gain.linearRampToValueAtTime(on?0.05:0, ctx.currentTime+0.6);
-  }
-  function isOn(){ return on; }
-  function isStarted(){ return started; }
-  return { ensureStarted, setOn, isOn, isStarted };
-})();
-document.getElementById('musicToggle').addEventListener('click', ()=>{
-  const btn = document.getElementById('musicToggle');
-  if(!Music.isStarted()){
-    // first ever interaction with the button — just start it playing, don't
-    // immediately toggle it back off
-    Music.ensureStarted();
-    btn.textContent = '🎵'; btn.classList.remove('muted');
-  } else {
-    const next = !Music.isOn();
-    Music.setOn(next);
-    btn.textContent = next ? '🎵' : '🔇';
-    btn.classList.toggle('muted', !next);
-  }
-});
-
 /* ---------- floating hearts on intro ---------- */
 (function(){
   const layer = document.getElementById('heartsLayer');
@@ -579,7 +514,6 @@ function zoomFlash(){
   function advance(){
     if(done) return;
     done = true;
-    Music.ensureStarted();
     scrollCue.style.opacity = '0';
     introZoom.classList.add('zoom-exit');
     setTimeout(()=>{ intro.classList.add('zoom-exit'); }, 200);
@@ -1007,7 +941,7 @@ function startCuteness(mount, onWin){
 
   function addSegment(state, len, startX){
     for(let i=0;i<len;i++) terrain.push({x:startX+i*TILE, h:state});
-    if(Math.random() < 0.4) return; // skip this segment's spike entirely — the breathing room
+    if(Math.random() < 0.55) return; // skip this segment's spike entirely — the breathing room
     let spikeX;
     if(state===LOW){
       spikeX = startX + Math.floor(len/2)*TILE;               // midpoint of the lower ramp
@@ -1038,7 +972,7 @@ function startCuteness(mount, onWin){
   let player = { x:70, y:groundBase-LOW*TILE-44, w:44, h:44, vy:0, jumping:false, rotation:0 };
   // snappier arc than a floaty jump — same max height, ~35% quicker up-and-down — so a
   // spacebar press reads as instant rather than sluggish
-  const GRAVITY=0.88, JUMP_V=-14.6;
+  const GRAVITY=0.74, JUMP_V=-15.0;
   let survived=0, speed=4.4;
   let running=true, invuln=0, tryAgain=0;
   let worldX=0;
@@ -1066,7 +1000,8 @@ function startCuteness(mount, onWin){
   function loop(now){
     if(!running) return;
     const dt = Math.min(now-lastTime, 50); lastTime = now;
-    const scrollPx = speed * (dt/16.6667);
+    const frameScale = dt/16.6667;
+    const scrollPx = speed * frameScale;
     ctx.clearRect(0,0,W,H);
     // sky
     const g = ctx.createLinearGradient(0,0,0,H);
@@ -1096,8 +1031,11 @@ function startCuteness(mount, onWin){
     speed = 4.4 + survived*0.08; // a gentle ramp so it builds a little, not a flat 20s
 
     // physics — the ground always just catches you; no fail condition lives here at all
-    player.vy += GRAVITY;
-    player.y += player.vy;
+    // (scaled by frameScale so the arc plays at the same real-world speed regardless of
+    // the browser/display's actual frame rate — this is what made jumps fly by way too
+    // fast on high-refresh-rate Chrome setups when it was left unscaled)
+    player.vy += GRAVITY*frameScale;
+    player.y += player.vy*frameScale;
     if(player.jumping) player.rotation += dt*0.006;
     const feetY = player.y + player.h;
     const surfaceY = groundBase - colHeightAt(player.x + player.w*0.5)*TILE;
